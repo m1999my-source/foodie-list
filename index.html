@@ -20,7 +20,6 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* 手繪質感卡片邊框 */
     .doodle-card { 
       background-color: #FFFFFF;
       border: 3px solid #FFD1DC;
@@ -51,7 +50,7 @@
 
   <div id="app" class="max-w-md mx-auto pb-28">
     
-    <!-- 頂部可愛標題與狀態 -->
+    <!-- 頂部標題與狀態 -->
     <div class="flex justify-between items-center mb-5 px-1 pt-2">
       <div class="flex items-center gap-2">
         <span class="text-3xl animate-bounce">🥐</span>
@@ -65,7 +64,7 @@
       </div>
     </div>
 
-    <!-- 可愛分頁切換 (想去 vs 已踩點) -->
+    <!-- 可愛分頁切換 (許願 vs 打卡) -->
     <div class="flex bg-[#FFE8ED] p-1.5 rounded-3xl mb-5 border-2 border-[#FFC2D1]">
       <button @click="activeTab = 'wish'" 
               :class="activeTab === 'wish' ? 'bg-[#FF6B8B] text-white doodle-button' : 'text-[#FF85A1]'"
@@ -88,17 +87,17 @@
       </div>
     </div>
 
-    <!-- 分類快速篩選 -->
+    <!-- 地區快速篩選 -->
     <div class="flex gap-2 overflow-x-auto no-scrollbar pb-3 px-1">
       <button @click="selectedCategory = 'all'" 
               :class="selectedCategory === 'all' ? 'bg-[#FFB6C1] text-[#5A493A] border-2 border-[#5A493A]' : 'bg-white text-[#FF85A1] border-2 border-[#FFE8ED]'"
               class="px-4 py-1.5 rounded-full text-xs font-black transition-all whitespace-nowrap">
-        ✨ 全部類別
+        ✨ 全部地區
       </button>
       <button v-for="cat in categories" :key="cat" @click="selectedCategory = cat"
               :class="selectedCategory === cat ? 'bg-[#FFB6C1] text-[#5A493A] border-2 border-[#5A493A]' : 'bg-white text-[#FF85A1] border-2 border-[#FFE8ED]'"
               class="px-4 py-1.5 rounded-full text-xs font-black transition-all whitespace-nowrap">
-        🍧 {{ cat }}
+        📍 {{ cat }}
       </button>
     </div>
 
@@ -113,11 +112,11 @@
         
         <div class="flex justify-between items-start gap-2 mb-2">
           <div>
-            <span class="text-[10px] font-black bg-[#FFF0F3] text-[#FF6B8B] px-2.5 py-1 rounded-full border border-[#FFD1DC] mr-1 inline-block mb-1">
-              🏷️ {{ item.category || '美食' }}
-            </span>
-            <span v-if="item.area" class="text-[10px] font-black bg-[#E8F5E9] text-[#2E7D32] px-2.5 py-1 rounded-full border border-[#C8E6C9] inline-block mb-1">
+            <span v-if="item.area" class="text-[10px] font-black bg-[#E8F5E9] text-[#2E7D32] px-2.5 py-1 rounded-full border border-[#C8E6C9] mr-1 inline-block mb-1">
               📍 {{ item.area }}
+            </span>
+            <span v-if="item.category" class="text-[10px] font-black bg-[#FFF0F3] text-[#FF6B8B] px-2.5 py-1 rounded-full border border-[#FFD1DC] inline-block mb-1">
+              🏷️ {{ item.category }}
             </span>
             <h3 class="text-lg font-black text-[#5A493A] leading-snug mt-1">{{ item.name }}</h3>
           </div>
@@ -129,12 +128,12 @@
           </a>
         </div>
 
-        <!-- 已踩點專屬星級評分 -->
+        <!-- 評分 -->
         <div v-if="item.visited && item.rating" class="flex items-center gap-1 text-amber-400 my-1 text-base">
           <span>{{ '⭐'.repeat(item.rating) }}</span>
         </div>
 
-        <!-- 招牌必點 / 備註內容 -->
+        <!-- 備註內容 -->
         <p v-if="item.notes" class="text-xs font-bold text-[#7A6858] leading-relaxed my-2 bg-[#FFFDF5] p-3 rounded-2xl border-2 border-dashed border-[#FFE082] whitespace-pre-wrap">
           <span class="text-[#FF8F00]">💬 想吃筆記：</span>{{ item.notes }}
         </p>
@@ -160,14 +159,14 @@
       </div>
     </div>
 
-    <!-- 底部固定按鈕 -->
+    <!-- 底部新增按鈕 -->
     <div class="fixed bottom-6 left-0 right-0 px-4 max-w-md mx-auto z-40">
       <button @click="openAddDialog" class="w-full bg-[#FF6B8B] hover:bg-[#FF5277] text-white py-4 rounded-3xl text-center font-black text-base doodle-button transition-transform">
         ➕ 偷偷收藏新餐廳 🍭
       </button>
     </div>
 
-    <!-- 彈出視窗對話盒 -->
+    <!-- 彈出對話盒 -->
     <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-end justify-center z-50 animate-fade-in" @click.self="showModal = false">
       <div class="bg-[#FFFDF0] w-full max-w-md rounded-t-[36px] p-6 pb-8 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar border-t-4 border-[#FFB6C1]">
         <div class="w-12 h-2 bg-[#FFD1DC] rounded-full mx-auto mb-4"></div>
@@ -177,14 +176,12 @@
         </h3>
 
         <div class="space-y-3">
-          <!-- 餐廳名稱 -->
           <div>
             <label class="text-xs font-black text-[#FF85A1] mb-1 block">餐廳名字 *</label>
             <input type="text" v-model="form.name" placeholder="例如：貓咪草莓舒芙蕾 🥞" 
                    class="w-full p-3 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] text-[#5A493A]">
           </div>
 
-          <!-- 地區與類別 -->
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="text-xs font-black text-[#FF85A1] mb-1 block">在哪裡？</label>
@@ -198,14 +195,12 @@
             </div>
           </div>
 
-          <!-- Google 地圖連結 -->
           <div>
             <label class="text-xs font-black text-[#FF85A1] mb-1 block">Google 地圖連結 (留空會自動搜尋喔)</label>
             <input type="text" v-model="form.mapUrl" placeholder="貼上 Google Maps 網址..." 
                    class="w-full p-3 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] text-[#5A493A]">
           </div>
 
-          <!-- 踩點狀態與評分 -->
           <div class="bg-white p-3.5 rounded-2xl border-2 border-[#FFD1DC] space-y-2">
             <div class="flex justify-between items-center">
               <span class="text-xs font-black text-[#5A493A]">已經吃過了嗎？</span>
@@ -216,7 +211,6 @@
               </button>
             </div>
 
-            <!-- 星級評分 -->
             <div v-if="form.visited" class="flex items-center justify-between pt-2 border-t border-[#FFE8ED]">
               <span class="text-xs font-black text-[#FF85A1]">好吃的程度：</span>
               <div class="flex gap-1 text-xl">
@@ -227,7 +221,6 @@
             </div>
           </div>
 
-          <!-- 招牌必點與備註 -->
           <div>
             <label class="text-xs font-black text-[#FF85A1] mb-1 block">必點招牌 / 心得備註</label>
             <textarea v-model="form.notes" rows="3" placeholder="例如：一定要點限量的抹茶千層蛋糕！" 
@@ -247,6 +240,7 @@
     const { createApp, ref, computed, onMounted } = Vue;
     createApp({
       setup() {
+        // 已更新為你的 Realtime Database 網址
         const firebaseUrl = "https://your-foodie-app-default-rtdb.firebaseio.com/food_places.json";
 
         const places = ref([]);
@@ -268,9 +262,14 @@
           notes: ''
         });
 
+        // 按「地區 (area)」收集分類標籤
         const categories = computed(() => {
           const set = new Set();
-          places.value.forEach(p => { if (p.category) set.add(p.category); });
+          places.value.forEach(p => { 
+            if (p.area && p.area.trim() !== '') {
+              set.add(p.area.trim()); 
+            }
+          });
           return Array.from(set);
         });
 
@@ -280,7 +279,7 @@
         const filteredPlaces = computed(() => {
           return places.value.filter(p => {
             const matchesTab = activeTab.value === 'visited' ? p.visited : !p.visited;
-            const matchesCat = selectedCategory.value === 'all' || p.category === selectedCategory.value;
+            const matchesCat = selectedCategory.value === 'all' || p.area === selectedCategory.value;
             
             const q = searchText.value.toLowerCase().trim();
             const matchesSearch = !q || 
