@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>Our Foodie Pocket List 🥢</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght=500;700;900&family=Noto+Sans+TC:wght=400;500;700&display=swap" rel="stylesheet">
+  
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+  <style>
+    body { 
+      font-family: 'Noto Sans TC', sans-serif; 
+      background-color: #FBF9F5;
+      color: #4A3B32;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .font-serif-title {
+      font-family: 'Noto Serif TC', serif;
+    }
+    .wood-card { 
+      background-color: #FFFFFF;
+      border: 1px solid #EAE3D2;
+      box-shadow: 0 8px 20px rgba(74, 59, 50, 0.05); 
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+    .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  </style>
+</head>
+<body class="p-4 md:p-8 select-none">
+
+  <div id="app" class="max-w-md mx-auto pb-24">
+    
+    <!-- 頂部標題與狀態 -->
+    <div class="flex justify-between items-center mb-6 px-1 pt-2">
+      <div>
+        <h1 class="text-2xl font-bold font-serif-title text-[#4A3B32] tracking-wider">美食口袋名單 🥢</h1>
+        <p class="text-xs text-[#8C7A6B] mt-0.5 font-medium">我們的美味探索地圖</p>
+      </div>
+      <div v-if="isSyncing" class="text-xs font-bold text-[#A45D3B] bg-[#F5EBE6] px-3 py-1 rounded-full flex items-center gap-1">
+        <span class="animate-spin inline-block">🔄</span> 同步中
+      </div>
+    </div>
+
+    <!-- 狀態頁籤切換 (想去 vs 已踩點) -->
+    <div class="flex bg-[#EAE3D2]/60 p-1 rounded-2xl mb-5">
+      <button @click="activeTab = 'wish'" 
+              :class="activeTab === 'wish' ? 'bg-[#4A3B32] text-[#FBF9F5] shadow-sm' : 'text-[#8C7A6B]'"
+              class="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-center">
+        ✨ 想去地圖 ({{ wishListCount }})
+      </button>
+      <button @click="activeTab = 'visited'" 
+              :class="activeTab === 'visited' ? 'bg-[#4A3B32] text-[#FBF9F5] shadow-sm' : 'text-[#8C7A6B]'"
+              class="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-center">
+        🍱 已踩點紀錄 ({{ visitedListCount }})
+      </button>
+    </div>
+
+    <!-- 搜尋框 -->
+    <div class="mb-4">
+      <div class="relative">
+        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-[#A8988B]">🔍</span>
+        <input v-model="searchText" type="text" placeholder="搜尋餐廳、地區、菜式、必點..." 
+               class="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-[#EAE3D2] focus:outline-none focus:border-[#8C6D58] text-gray-700 shadow-xs transition-all placeholder-[#C7BCB3] text-sm">
+      </div>
+    </div>
+
+    <!-- 分類快速篩選 -->
+    <div class="flex gap-2 overflow-x-auto no-scrollbar pb-3 px-1">
+      <button @click="selectedCategory = 'all'" 
+              :class="selectedCategory === 'all' ? 'bg-[#8C6D58] text-white' : 'bg-white text-[#8C7A6B] border border-[#EAE3D2]'"
+              class="px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap">
+        全部類別
+      </button>
+      <button v-for="cat in categories" :key="cat" @click="selectedCategory = cat"
+              :class="selectedCategory === cat ? 'bg-[#8C6D58] text-white' : 'bg-white text-[#8C7A6B] border border-[#EAE3D2]'"
+              class="px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap">
+        {{ cat }}
+      </button>
+    </div>
+
+    <!-- 餐廳列表 -->
+    <div class="space-y-4">
+      <div v-if="filteredPlaces.length === 0" class="text-center py-16 text-[#B5A89E] font-medium text-sm leading-relaxed">
+        🧼 目前沒有符合的餐廳資料唷<br>點選下方按鈕新增一間吧！
+      </div>
+
+      <div v-for="item in filteredPlaces" :key="item.id" 
+           class="wood-card rounded-2xl p-5 relative transition-all">
+        
+        <div class="flex justify-between items-start gap-2 mb-2">
+          <div>
+            <span class="text-[11px] font-bold bg-[#F5EBE6] text-[#A45D3B] px-2 py-0.5 rounded-md mr-1.5 inline-block mb-1">
+              {{ item.category || '未分類' }}
+            </span>
+            <span v-if="item.area" class="text-[11px] font-bold bg-[#EFECE6] text-[#6E6259] px-2 py-0.5 rounded-md inline-block mb-1">
+              📍 {{ item.area }}
+            </span>
+            <h3 class="text-lg font-bold text-[#4A3B32] leading-snug">{{ item.name }}</h3>
+          </div>
+
+          <!-- 地圖連結按鈕 -->
+          <a :href="getGoogleMapsUrl(item)" target="_blank" 
+             class="flex items-center gap-1 bg-[#F0EAE1] hover:bg-[#E5DDD0] text-[#5C4A3E] px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap border border-[#E0D5C5]">
+            🗺️ 地圖
+          </a>
+        </div>
+
+        <!-- 已踩點專屬星級評分 -->
+        <div v-if="item.visited && item.rating" class="flex items-center gap-1 text-amber-500 my-1 text-sm">
+          <span>{{ '⭐'.repeat(item.rating) }}</span>
+        </div>
+
+        <!-- 招牌必點 / 備註內容 -->
+        <p v-if="item.notes" class="text-xs text-[#6E6259] leading-relaxed my-2 bg-[#FAF8F5] p-2.5 rounded-xl border border-[#F0EAE1] whitespace-pre-wrap">
+          <span class="font-bold text-[#8C6D58]">💡 備註：</span>{{ item.notes }}
+        </p>
+
+        <!-- 底部控制列 -->
+        <div class="flex justify-between items-center mt-3 pt-2 border-t border-dashed border-[#EAE3D2]">
+          <button @click="toggleVisited(item)" 
+                  :class="item.visited ? 'text-[#8C7A6B] bg-[#EFECE6]' : 'text-[#A45D3B] bg-[#F5EBE6]'"
+                  class="text-xs font-bold px-3 py-1.5 rounded-xl transition-colors">
+            {{ item.visited ? '↩️ 移回想去' : '🍱 標記為已踩點' }}
+          </button>
+
+          <div class="flex gap-2">
+            <button @click="openEditDialog(item)" class="text-xs font-bold text-[#8C6D58] hover:text-[#5C4A3E] bg-[#F0EAE1] px-2.5 py-1.5 rounded-xl transition-colors">
+              修改 ✏️
+            </button>
+            <button @click="deletePlace(item)" class="text-xs font-bold text-red-400 hover:text-red-600 bg-red-50 px-2.5 py-1.5 rounded-xl transition-colors">
+              刪除 🗑️
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 底部新增按鈕 -->
+    <div class="fixed bottom-6 left-0 right-0 px-4 max-w-md mx-auto z-40">
+      <button @click="openAddDialog" class="w-full bg-[#4A3B32] hover:bg-[#362A23] text-[#FBF9F5] py-4 rounded-2xl text-center font-bold text-base shadow-lg shadow-[#4A3B32]/20 active:scale-95 transition-all">
+        + 新增口袋餐廳 🍜
+      </button>
+    </div>
+
+    <!-- 彈出視窗對話盒 -->
+    <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-end justify-center z-50 animate-fade-in" @click.self="showModal = false">
+      <div class="bg-[#FBF9F5] w-full max-w-md rounded-t-[32px] p-6 pb-8 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar border-t border-[#EAE3D2]">
+        <div class="w-12 h-1.5 bg-[#EAE3D2] rounded-full mx-auto mb-4"></div>
+        
+        <h3 class="text-lg font-bold font-serif-title text-[#4A3B32] text-center mb-4">
+          {{ isEditingMode ? '修改餐廳資訊 ✏️' : '收藏新餐廳 📌' }}
+        </h3>
+
+        <div class="space-y-3">
+          <!-- 餐廳名稱 -->
+          <div>
+            <label class="text-xs font-bold text-[#8C7A6B] mb-1 block">餐廳名稱 *</label>
+            <input type="text" v-model="form.name" placeholder="例如：築地壽司 / Blue Bottle Coffee" 
+                   class="w-full p-3 bg-white border border-[#EAE3D2] rounded-xl text-sm focus:outline-none focus:border-[#8C6D58] text-[#4A3B32]">
+          </div>
+
+          <!-- 地區與類別 -->
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs font-bold text-[#8C7A6B] mb-1 block">地區/地點</label>
+              <input type="text" v-model="form.area" placeholder="例如：中環 / 新宿" 
+                     class="w-full p-3 bg-white border border-[#EAE3D2] rounded-xl text-sm focus:outline-none focus:border-[#8C6D58] text-[#4A3B32]">
+            </div>
+            <div>
+              <label class="text-xs font-bold text-[#8C7A6B] mb-1 block">類別</label>
+              <input type="text" v-model="form.category" placeholder="例如：咖啡廳 / 居酒屋" 
+                     class="w-full p-3 bg-white border border-[#EAE3D2] rounded-xl text-sm focus:outline-none focus:border-[#8C6D58] text-[#4A3B32]">
+            </div>
+          </div>
+
+          <!-- Google 地圖網址或搜尋關鍵字 -->
+          <div>
+            <label class="text-xs font-bold text-[#8C7A6B] mb-1 block">Google Maps 網址 (可留空，自動用店名搜尋)</label>
+            <input type="text" v-model="form.mapUrl" placeholder="貼上 Google 地圖分享連結..." 
+                   class="w-full p-3 bg-white border border-[#EAE3D2] rounded-xl text-sm focus:outline-none focus:border-[#8C6D58] text-[#4A3B32]">
+          </div>
+
+          <!-- 踩點狀態與評分 -->
+          <div class="bg-white p-3.5 rounded-xl border border-[#EAE3D2] space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-bold text-[#4A3B32]">是否已踩點過？</span>
+              <button @click="form.visited = !form.visited" 
+                      :class="form.visited ? 'bg-[#8C6D58] text-white' : 'bg-[#EFECE6] text-[#8C7A6B]'" 
+                      class="px-3 py-1 rounded-lg text-xs font-bold transition-all">
+                {{ form.visited ? '已踩點 🍱' : '尚未去 ✨' }}
+              </button>
+            </div>
+
+            <!-- 星級評分 -->
+            <div v-if="form.visited" class="flex items-center justify-between pt-2 border-t border-[#F0EAE1]">
+              <span class="text-xs font-bold text-[#8C7A6B]">給這間店評分：</span>
+              <div class="flex gap-1 text-lg">
+                <span v-for="star in 5" :key="star" @click="form.rating = star" class="cursor-pointer">
+                  {{ star <= form.rating ? '⭐' : '☆' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 招牌必點與備註 -->
+          <div>
+            <label class="text-xs font-bold text-[#8C7A6B] mb-1 block">招牌菜 / 備註</label>
+            <textarea v-model="form.notes" rows="3" placeholder="例如：必點海膽手卷、需要提前一個月預約..." 
+                      class="w-full p-3 bg-white border border-[#EAE3D2] rounded-xl text-sm focus:outline-none focus:border-[#8C6D58] text-[#4A3B32] resize-none"></textarea>
+          </div>
+        </div>
+
+        <button @click="savePlace" class="w-full bg-[#4A3B32] text-[#FBF9F5] py-3.5 rounded-xl font-bold text-sm mt-4 active:scale-95 transition-transform shadow-md">
+          {{ isEditingMode ? '確認儲存修改 ✏️' : '加入口袋名單 🥢' }}
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const { createApp, ref, computed, onMounted } = Vue;
+    createApp({
+      setup() {
+        const firebaseUrl = "https://your-foodie-app-default-rtdb.firebaseio.com/food_places.json";
+
+        const places = ref([]);
+        const activeTab = ref('wish'); // 'wish' 或 'visited'
+        const searchText = ref('');
+        const selectedCategory = ref('all');
+        const showModal = ref(false);
+        const isSyncing = ref(false);
+        const isEditingMode = ref(false);
+        const currentEditingId = ref(null);
+
+        const form = ref({
+          name: '',
+          area: '',
+          category: '',
+          mapUrl: '',
+          visited: false,
+          rating: 3,
+          notes: ''
+        });
+
+        // 動態提取所有分類標籤
+        const categories = computed(() => {
+          const set = new Set();
+          places.value.forEach(p => { if (p.category) set.add(p.category); });
+          return Array.from(set);
+        });
+
+        const wishListCount = computed(() => places.value.filter(p => !p.visited).length);
+        const visitedListCount = computed(() => places.value.filter(p => p.visited).length);
+
+        // 篩選餐廳列表
+        const filteredPlaces = computed(() => {
+          return places.value.filter(p => {
+            const matchesTab = activeTab.value === 'visited' ? p.visited : !p.visited;
+            const matchesCat = selectedCategory.value === 'all' || p.category === selectedCategory.value;
+            
+            const q = searchText.value.toLowerCase().trim();
+            const matchesSearch = !q || 
+              (p.name && p.name.toLowerCase().includes(q)) ||
+              (p.area && p.area.toLowerCase().includes(q)) ||
+              (p.category && p.category.toLowerCase().includes(q)) ||
+              (p.notes && p.notes.toLowerCase().includes(q));
+
+            return matchesTab && matchesCat && matchesSearch;
+          });
+        });
+
+        // 產生 Google 地圖 URL
+        const getGoogleMapsUrl = (item) => {
+          if (item.mapUrl && item.mapUrl.startsWith('http')) return item.mapUrl;
+          const query = encodeURIComponent(`${item.area || ''} ${item.name}`);
+          return `https://www.google.com/maps/search/?api=1&query=${query}`;
+        };
+
+        const fetchPlaces = async () => {
+          try {
+            const res = await fetch(firebaseUrl);
+            const data = await res.json();
+            if (data) {
+              places.value = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+            } else {
+              places.value = [];
+            }
+          } catch (e) { console.error("同步失敗:", e); }
+        };
+
+        const silentFetch = async () => {
+          if (showModal.value) return;
+          await fetchPlaces();
+        };
+
+        const openAddDialog = () => {
+          isEditingMode.value = false;
+          currentEditingId.value = null;
+          form.value = { name: '', area: '', category: '', mapUrl: '', visited: activeTab.value === 'visited', rating: 5, notes: '' };
+          showModal.value = true;
+        };
+
+        const openEditDialog = (item) => {
+          isEditingMode.value = true;
+          currentEditingId.value = item.id;
+          form.value = { ...item };
+          showModal.value = true;
+        };
+
+        const savePlace = async () => {
+          if (!form.value.name.trim()) return alert("請輸入餐廳名稱！");
+          isSyncing.value = true;
+          showModal.value = false;
+
+          try {
+            const key = isEditingMode.value ? currentEditingId.value : ("place_" + Date.now());
+            const singleUrl = firebaseUrl.replace(".json", `/${key}.json`);
+
+            await fetch(singleUrl, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(form.value)
+            });
+
+            await fetchPlaces();
+          } catch (e) { alert("儲存失敗！"); }
+          isSyncing.value = false;
+        };
+
+        const toggleVisited = async (item) => {
+          isSyncing.value = true;
+          try {
+            const singleUrl = firebaseUrl.replace(".json", `/${item.id}.json`);
+            await fetch(singleUrl, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ visited: !item.visited })
+            });
+            await fetchPlaces();
+          } catch (e) { console.error(e); }
+          isSyncing.value = false;
+        };
+
+        const deletePlace = async (item) => {
+          if (!confirm(`確定要刪除「${item.name}」嗎？`)) return;
+          isSyncing.value = true;
+          try {
+            const singleUrl = firebaseUrl.replace(".json", `/${item.id}.json`);
+            await fetch(singleUrl, { method: "DELETE" });
+            await fetchPlaces();
+          } catch (e) { console.error(e); }
+          isSyncing.value = false;
+        };
+
+        onMounted(() => {
+          fetchPlaces();
+          setInterval(silentFetch, 5000);
+        });
+
+        return { places, activeTab, searchText, selectedCategory, categories, wishListCount, visitedListCount, filteredPlaces, showModal, isSyncing, isEditingMode, form, getGoogleMapsUrl, openAddDialog, openEditDialog, savePlace, toggleVisited, deletePlace };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
