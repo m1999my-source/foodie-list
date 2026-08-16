@@ -1,21 +1,12 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" class="transition-colors duration-300">
 <head>
   <meta charset="UTF-8">
   <title>Foodie Pocket List 🍩</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   
-  <link rel="preconnect" href="https://fonts.googleap<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="UTF-8">
-  <title>Foodie Pocket List 🍩</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  
-  <!-- 🎨 自訂網站圖示 (請替換成你的圖片檔名或網址) -->
-  <link rel="icon" type="image/png" href="my-icon.jpg">
-  <!-- 手機加到主畫面的應用程式圖示 -->
-  <link rel="apple-touch-icon" href="my-icon.jpg">
+  <link rel="icon" type="image/png" href="my-icon.png">
+  <link rel="apple-touch-icon" href="my-icon.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,31 +14,55 @@
   
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   <style>
     body { 
       font-family: 'Zen Maru Gothic', 'Noto Sans TC', sans-serif; 
-      background-color: #FFFDF0;
-      color: #5A493A;
       -webkit-tap-highlight-color: transparent;
     }
 
-    .doodle-card { 
+    /* Light Mode Palette */
+    body.light {
+      background-color: #FFFDF0;
+      color: #5A493A;
+    }
+    .light .doodle-card { 
       background-color: #FFFFFF;
       border: 2.5px solid #FFD1DC;
-      border-radius: 20px;
       box-shadow: 3px 4px 0px #FFB6C1;
     }
-
-    .doodle-button {
+    .light .doodle-button {
       border: 2px solid #5A493A;
       box-shadow: 2px 3px 0px #5A493A;
     }
-    
-    .doodle-button:active {
+    .light .doodle-button:active {
       transform: translate(2px, 2px);
       box-shadow: 0px 0px 0px #5A493A;
     }
+    .light .modal-bg { background-color: #FFFDF0; border-color: #FFB6C1; }
+    .light .input-box { background-color: #FFFFFF; border-color: #FFD1DC; color: #5A493A; }
+
+    /* Dark Mode Palette */
+    body.dark {
+      background-color: #1A1625;
+      color: #E2D9F3;
+    }
+    .dark .doodle-card {
+      background-color: #262035;
+      border: 2.5px solid #4A3B5C;
+      box-shadow: 3px 4px 0px #342845;
+    }
+    .dark .doodle-button {
+      border: 2px solid #E2D9F3;
+      box-shadow: 2px 3px 0px #E2D9F3;
+    }
+    .dark .doodle-button:active {
+      transform: translate(2px, 2px);
+      box-shadow: 0px 0px 0px #E2D9F3;
+    }
+    .dark .modal-bg { background-color: #262035; border-color: #4A3B5C; }
+    .dark .input-box { background-color: #1A1625; border-color: #4A3B5C; color: #E2D9F3; }
 
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -56,142 +71,166 @@
     .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+    .wheel-canvas {
+      transition: transform 4s cubic-bezier(0.15, 0.99, 0.18, 1);
+    }
   </style>
 </head>
-<body class="p-4 md:p-8 select-none">
+<body :class="isDarkMode ? 'dark' : 'light'" class="p-4 md:p-8 select-none transition-colors duration-300">
 
-  <div id="app" class="max-w-md mx-auto pb-28">
+  <div id="app" class="max-w-md mx-auto pb-32">
     
-    <!-- 頂部標題與狀態 -->
+    <!-- Header Controls -->
     <div class="flex justify-between items-center mb-4 px-1 pt-2">
       <div class="flex items-center gap-2">
         <span class="text-3xl animate-bounce">🥐</span>
         <div>
           <h1 class="text-2xl font-black text-[#FF6B8B] tracking-wider">美食大冒險！</h1>
-          <p class="text-xs text-[#FFA0B4] font-bold">共有 {{ places.length }} 間口袋名單 ✨</p>
+          <p class="text-xs font-bold opacity-80">共有 {{ places.length }} 間口袋名單 ✨</p>
         </div>
       </div>
-      <div v-if="isSyncing" class="text-xs font-black text-[#FF6B8B] bg-[#FFF0F3] px-3 py-1 rounded-full flex items-center gap-1 border-2 border-[#FFB6C1]">
-        <span class="animate-spin inline-block">🍳</span> 煮飯中
+      <div class="flex items-center gap-2">
+        <!-- Sync Indicator -->
+        <div v-if="isSyncing" class="text-xs font-black text-[#FF6B8B] bg-[#FFF0F3] dark:bg-[#342845] px-2.5 py-1 rounded-full flex items-center gap-1 border-2 border-[#FFB6C1] dark:border-[#4A3B5C]">
+          <span class="animate-spin inline-block">🍳</span>
+        </div>
+
+        <!-- Dark Mode Toggle -->
+        <button @click="toggleDarkMode" class="p-2 rounded-2xl bg-white dark:bg-[#262035] border-2 border-[#FFD1DC] dark:border-[#4A3B5C] text-sm shadow-xs transition-transform active:scale-95">
+          {{ isDarkMode ? '🌙' : '☀️' }}
+        </button>
       </div>
     </div>
 
-    <!-- 搜尋框 -->
+    <!-- Quick Action Bar (Wheel & Bulk Delete) -->
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <button @click="openWheelModal" class="py-2.5 px-3 bg-[#FFE082] text-[#FF6F00] dark:bg-[#FF8F00] dark:text-white rounded-2xl text-xs font-black doodle-button flex items-center justify-center gap-1.5 transition-transform">
+        🎰 今天吃什麼？
+      </button>
+      <button @click="toggleSelectMode" :class="isSelectMode ? 'bg-[#E53935] text-white' : 'bg-[#E0F2FE] text-[#0284C7] dark:bg-[#0369A1] dark:text-white'" class="py-2.5 px-3 rounded-2xl text-xs font-black doodle-button flex items-center justify-center gap-1.5 transition-transform">
+        {{ isSelectMode ? '✕ 退出管理' : '☑️ 批次管理' }}
+      </button>
+    </div>
+
+    <!-- Search Input -->
     <div class="mb-3">
       <div class="relative">
         <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-[#FF85A1]">🔍</span>
         <input v-model="searchText" type="text" placeholder="搜尋關鍵字..." 
-               class="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border-2 border-[#FFD1DC] focus:outline-none focus:border-[#FF6B8B] text-[#5A493A] font-bold shadow-xs transition-all placeholder-[#FFB6C1] text-xs">
+               class="w-full pl-10 pr-4 py-3 rounded-2xl border-2 focus:outline-none focus:border-[#FF6B8B] font-bold text-xs input-box transition-all">
       </div>
     </div>
 
-    <!-- 二級下拉選單篩選區 -->
+    <!-- Filters -->
     <div class="grid grid-cols-2 gap-2 mb-4">
-      <!-- 地點選擇器 -->
       <div>
         <select v-model="selectedArea" 
-                class="w-full p-2.5 bg-white border-2 border-[#C8E6C9] rounded-2xl text-xs font-black text-[#2E7D32] focus:outline-none focus:border-[#4CAF50] transition-all">
+                class="w-full p-2.5 border-2 border-[#C8E6C9] dark:border-[#2E7D32] rounded-2xl text-xs font-black text-[#2E7D32] dark:text-[#81C784] bg-white dark:bg-[#262035] focus:outline-none transition-all">
           <option value="">📍 所有地點 ({{ areaList.length }})</option>
-          <option v-for="area in areaList" :key="area" :value="area">
-            📍 {{ area }}
-          </option>
+          <option v-for="area in areaList" :key="area" :value="area">📍 {{ area }}</option>
         </select>
       </div>
 
-      <!-- 美食類型選擇器 -->
       <div>
         <select v-model="selectedCategory" 
-                class="w-full p-2.5 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-black text-[#FF6B8B] focus:outline-none focus:border-[#FF5277] transition-all">
+                class="w-full p-2.5 border-2 border-[#FFD1DC] dark:border-[#4A3B5C] rounded-2xl text-xs font-black text-[#FF6B8B] dark:text-[#FFA0B4] bg-white dark:bg-[#262035] focus:outline-none transition-all">
           <option value="">🏷️ 所有美食 ({{ categoryList.length }})</option>
-          <option v-for="cat in categoryList" :key="cat" :value="cat">
-            🏷️ {{ cat }}
-          </option>
+          <option v-for="cat in categoryList" :key="cat" :value="cat">🏷️ {{ cat }}</option>
         </select>
       </div>
     </div>
 
-    <!-- 已選條件重設條 -->
-    <div v-if="selectedArea || selectedCategory || searchText" class="flex justify-between items-center bg-[#FFF0F3] px-3 py-1.5 rounded-xl mb-4 text-xs border border-[#FFD1DC]">
-      <span class="font-bold text-[#FF6B8B]">
-        顯示 {{ filteredPlaces.length }} 筆篩選結果
-      </span>
-      <button @click="resetFilters" class="font-black text-[#E53935] hover:underline">
-        ✕ 清除篩選
+    <!-- Active Filters Reset Bar -->
+    <div v-if="selectedArea || selectedCategory || searchText" class="flex justify-between items-center bg-[#FFF0F3] dark:bg-[#342845] px-3 py-1.5 rounded-xl mb-4 text-xs border border-[#FFD1DC] dark:border-[#4A3B5C]">
+      <span class="font-bold text-[#FF6B8B]">顯示 {{ filteredPlaces.length }} 筆結果</span>
+      <button @click="resetFilters" class="font-black text-[#E53935] hover:underline">✕ 清除篩選</button>
+    </div>
+
+    <!-- Bulk Operation Bar -->
+    <div v-if="isSelectMode" class="flex justify-between items-center bg-[#E0F2FE] dark:bg-[#0369A1]/30 p-3 rounded-2xl mb-4 border-2 border-[#0284C7] text-xs">
+      <div class="flex items-center gap-2">
+        <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="w-4 h-4 rounded-sm accent-[#0284C7]">
+        <span class="font-black text-[#0284C7] dark:text-[#38BDF8]">已選擇 {{ selectedIds.length }} 項</span>
+      </div>
+      <button @click="deleteSelectedPlaces" :disabled="selectedIds.length === 0" class="px-3 py-1.5 bg-[#E53935] text-white font-black rounded-xl border border-[#B71C1C] disabled:opacity-50">
+        🗑️ 刪除選取
       </button>
     </div>
 
-    <!-- 餐廳清單列表 -->
+    <!-- List Section -->
     <div class="space-y-3">
-      <div v-if="filteredPlaces.length === 0" class="text-center py-16 text-[#FFB6C1] font-black text-sm leading-relaxed bg-white rounded-3xl border-2 border-dashed border-[#FFD1DC]">
+      <div v-if="filteredPlaces.length === 0" class="text-center py-16 text-[#FFB6C1] font-black text-sm leading-relaxed bg-white dark:bg-[#262035] rounded-3xl border-2 border-dashed border-[#FFD1DC] dark:border-[#4A3B5C]">
         🍩 找不到相關的美食<br>快點下方按鈕新增一間吧！
       </div>
 
       <div v-for="item in filteredPlaces" :key="item.id" 
-           class="doodle-card p-4 relative transition-all">
+           class="doodle-card p-4 relative transition-all" :class="{'ring-2 ring-[#0284C7]': selectedIds.includes(item.id)}">
         
-        <!-- 主要資料行 -->
         <div class="flex justify-between items-start gap-2">
+          <!-- Selection Checkbox -->
+          <div v-if="isSelectMode" class="pt-1">
+            <input type="checkbox" :value="item.id" v-model="selectedIds" class="w-5 h-5 rounded-sm accent-[#0284C7]">
+          </div>
+
           <div class="flex-1 min-w-0">
-            <!-- 地點與種類標籤 -->
+            <!-- Tags -->
             <div class="flex flex-wrap gap-1 mb-1">
-              <span v-if="item.area" class="text-[10px] font-black bg-[#E8F5E9] text-[#2E7D32] px-2 py-0.5 rounded-md border border-[#C8E6C9]">
+              <span v-if="item.area" class="text-[10px] font-black bg-[#E8F5E9] text-[#2E7D32] dark:bg-[#1B3E20] dark:text-[#81C784] px-2 py-0.5 rounded-md border border-[#C8E6C9] dark:border-[#2E7D32]">
                 📍 {{ item.area }}
               </span>
-              <span v-if="item.category" class="text-[10px] font-black bg-[#FFF0F3] text-[#FF6B8B] px-2 py-0.5 rounded-md border border-[#FFD1DC]">
+              <span v-if="item.category" class="text-[10px] font-black bg-[#FFF0F3] text-[#FF6B8B] dark:bg-[#342845] dark:text-[#FFA0B4] px-2 py-0.5 rounded-md border border-[#FFD1DC] dark:border-[#4A3B5C]">
                 🏷️ {{ item.category }}
               </span>
-              <span v-if="item.visited" class="text-[10px] font-black bg-[#FFF8E1] text-[#FF8F00] px-2 py-0.5 rounded-md border border-[#FFE082]">
+              <span v-if="item.visited" class="text-[10px] font-black bg-[#FFF8E1] text-[#FF8F00] dark:bg-[#3E2723] dark:text-[#FFB74D] px-2 py-0.5 rounded-md border border-[#FFE082] dark:border-[#FF8F00]">
                 🍱 已打卡
               </span>
             </div>
 
-            <!-- 餐廳名稱 -->
-            <h3 class="text-base font-black text-[#5A493A] truncate">{{ item.name }}</h3>
+            <h3 class="text-base font-black truncate">{{ item.name }}</h3>
           </div>
 
-          <!-- 右側操作按鈕 (地圖 + OpenRice + 編輯/刪除) -->
-          <div class="flex items-center gap-1.5 shrink-0">
+          <!-- Actions -->
+          <div v-if="!isSelectMode" class="flex items-center gap-1.5 shrink-0">
             <a :href="getGoogleMapsUrl(item)" target="_blank" 
-               class="bg-[#E3F2FD] text-[#1565C0] px-2 py-1 rounded-xl text-xs font-black doodle-button transition-transform flex items-center gap-0.5">
+               class="bg-[#E3F2FD] text-[#1565C0] dark:bg-[#1565C0] dark:text-white px-2 py-1 rounded-xl text-xs font-black doodle-button transition-transform flex items-center gap-0.5">
               🗺️ <span class="hidden sm:inline">地圖</span>
             </a>
             <a :href="getOpenRiceUrl(item)" target="_blank" 
-               class="bg-[#FFF3E0] text-[#E65100] px-2 py-1 rounded-xl text-xs font-black doodle-button transition-transform flex items-center gap-0.5">
+               class="bg-[#FFF3E0] text-[#E65100] dark:bg-[#E65100] dark:text-white px-2 py-1 rounded-xl text-xs font-black doodle-button transition-transform flex items-center gap-0.5">
               🍚 <span class="hidden sm:inline">OpenRice</span>
             </a>
-            <button @click="openEditDialog(item)" class="text-xs font-black text-[#FF8F00] bg-[#FFF8E1] p-1.5 rounded-xl border border-[#FFE082]">
+            <button @click="openEditDialog(item)" class="text-xs font-black text-[#FF8F00] bg-[#FFF8E1] dark:bg-[#3E2723] p-1.5 rounded-xl border border-[#FFE082] dark:border-[#FF8F00]">
               ✏️
             </button>
-            <button @click="deletePlace(item)" class="text-xs font-black text-[#E53935] bg-[#FFEBEE] p-1.5 rounded-xl border border-[#FFCDD2]">
+            <button @click="deletePlace(item)" class="text-xs font-black text-[#E53935] bg-[#FFEBEE] dark:bg-[#3C1518] p-1.5 rounded-xl border border-[#FFCDD2] dark:border-[#E53935]">
               🗑️
             </button>
           </div>
         </div>
 
-        <!-- 評分 -->
         <div v-if="item.visited && item.rating" class="flex items-center gap-1 text-amber-400 mt-1 text-xs">
           <span>{{ '⭐'.repeat(item.rating) }}</span>
         </div>
 
-        <!-- 筆記 -->
-        <p v-if="item.notes" class="text-xs font-bold text-[#7A6858] leading-relaxed mt-2 bg-[#FFFDF5] p-2.5 rounded-xl border border-dashed border-[#FFE082] whitespace-pre-wrap">
+        <p v-if="item.notes" class="text-xs font-bold leading-relaxed mt-2 bg-[#FFFDF5] dark:bg-[#1E1B2E] p-2.5 rounded-xl border border-dashed border-[#FFE082] dark:border-[#4A3B5C] whitespace-pre-wrap">
           <span class="text-[#FF8F00]">💬 筆記：</span>{{ item.notes }}
         </p>
 
       </div>
     </div>
 
-    <!-- 底部新增按鈕 -->
-    <div class="fixed bottom-6 left-0 right-0 px-4 max-w-md mx-auto z-40">
+    <!-- Fixed Floating Action Button -->
+    <div class="fixed bottom-6 left-0 right-0 px-4 max-w-md mx-auto z-30">
       <button @click="openAddDialog" class="w-full bg-[#FF6B8B] hover:bg-[#FF5277] text-white py-4 rounded-3xl text-center font-black text-base doodle-button transition-transform">
         ➕ 收藏新餐廳 / 美食 🍭
       </button>
     </div>
 
-    <!-- 彈出對話盒 -->
-    <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-end justify-center z-50 animate-fade-in" @click.self="showModal = false">
-      <div class="bg-[#FFFDF0] w-full max-w-md rounded-t-[36px] p-6 pb-8 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar border-t-4 border-[#FFB6C1]">
-        <div class="w-12 h-2 bg-[#FFD1DC] rounded-full mx-auto mb-4"></div>
+    <!-- Add/Edit Modal -->
+    <div v-if="showModal" class="fixed inset-0 bg-black/50 flex items-end justify-center z-50 animate-fade-in" @click.self="showModal = false">
+      <div class="modal-bg w-full max-w-md rounded-t-[36px] p-6 pb-8 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar border-t-4">
+        <div class="w-12 h-2 bg-[#FFD1DC] dark:bg-[#4A3B5C] rounded-full mx-auto mb-4"></div>
         
         <h3 class="text-xl font-black text-[#FF6B8B] text-center mb-4">
           {{ isEditingMode ? '修改美食資料 ✏️' : '藏入美食寶箱 🎁' }}
@@ -201,46 +240,46 @@
           <div>
             <label class="text-xs font-black text-[#FF85A1] mb-1 block">餐廳名稱 *</label>
             <input type="text" v-model="form.name" placeholder="例如：貓咪草莓舒芙蕾 🥞" 
-                   class="w-full p-3 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] text-[#5A493A]">
+                   class="w-full p-3 border-2 rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] input-box">
           </div>
 
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="text-xs font-black text-[#FF85A1] mb-1 block">在哪裡？(地點)</label>
+              <label class="text-xs font-black text-[#FF85A1] mb-1 block">地點</label>
               <input type="text" v-model="form.area" placeholder="例如：中環 / 澀谷" 
-                     class="w-full p-3 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] text-[#5A493A]">
+                     class="w-full p-3 border-2 rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] input-box">
             </div>
             <div>
-              <label class="text-xs font-black text-[#FF85A1] mb-1 block">什麼種類？(美食)</label>
+              <label class="text-xs font-black text-[#FF85A1] mb-1 block">種類</label>
               <input type="text" v-model="form.category" placeholder="例如：甜點 / 鬆餅" 
-                     class="w-full p-3 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] text-[#5A493A]">
+                     class="w-full p-3 border-2 rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] input-box">
             </div>
           </div>
 
           <div>
             <label class="text-xs font-black text-[#FF85A1] mb-1 block">Google 地圖連結 (留空自動搜尋)</label>
             <input type="text" v-model="form.mapUrl" placeholder="貼上 Google Maps 網址..." 
-                   class="w-full p-3 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] text-[#5A493A]">
+                   class="w-full p-3 border-2 rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] input-box">
           </div>
 
           <div>
             <label class="text-xs font-black text-[#FF85A1] mb-1 block">OpenRice 連結 (留空自動搜尋)</label>
             <input type="text" v-model="form.openriceUrl" placeholder="貼上 OpenRice 網址..." 
-                   class="w-full p-3 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] text-[#5A493A]">
+                   class="w-full p-3 border-2 rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] input-box">
           </div>
 
-          <div class="bg-white p-3.5 rounded-2xl border-2 border-[#FFD1DC] space-y-2">
+          <div class="input-box p-3.5 rounded-2xl border-2 space-y-2">
             <div class="flex justify-between items-center">
-              <span class="text-xs font-black text-[#5A493A]">已經吃過了嗎？</span>
+              <span class="text-xs font-black">已經吃過了嗎？</span>
               <button @click="form.visited = !form.visited" 
-                      :class="form.visited ? 'bg-[#FF6B8B] text-white' : 'bg-[#FFE8ED] text-[#FF85A1]'" 
+                      :class="form.visited ? 'bg-[#FF6B8B] text-white' : 'bg-[#FFE8ED] text-[#FF85A1] dark:bg-[#342845]'" 
                       class="px-3 py-1.5 rounded-xl text-xs font-black transition-all">
                 {{ form.visited ? '吃過了 🍱' : '還沒吃 ✨' }}
               </button>
             </div>
 
-            <div v-if="form.visited" class="flex items-center justify-between pt-2 border-t border-[#FFE8ED]">
-              <span class="text-xs font-black text-[#FF85A1]">好吃的程度：</span>
+            <div v-if="form.visited" class="flex items-center justify-between pt-2 border-t border-[#FFE8ED] dark:border-[#4A3B5C]">
+              <span class="text-xs font-black text-[#FF85A1]">美味程度：</span>
               <div class="flex gap-1 text-xl">
                 <span v-for="star in 5" :key="star" @click="form.rating = star" class="cursor-pointer transition-transform active:scale-125">
                   {{ star <= form.rating ? '⭐' : '☆' }}
@@ -252,7 +291,7 @@
           <div>
             <label class="text-xs font-black text-[#FF85A1] mb-1 block">筆記 / 心得</label>
             <textarea v-model="form.notes" rows="3" placeholder="例如：一定要點限量的抹茶千層蛋糕！" 
-                      class="w-full p-3 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] text-[#5A493A] resize-none"></textarea>
+                      class="w-full p-3 border-2 rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] input-box resize-none"></textarea>
           </div>
         </div>
 
@@ -262,10 +301,45 @@
       </div>
     </div>
 
+    <!-- Random Wheel Drawer Modal -->
+    <div v-if="showWheelModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" @click.self="showWheelModal = false">
+      <div class="modal-bg w-full max-w-sm rounded-3xl p-6 border-4 text-center relative shadow-2xl">
+        <h3 class="text-xl font-black text-[#FF6B8B] mb-2">🎰 今天吃什麼？</h3>
+        <p class="text-xs font-bold opacity-75 mb-4">選不出來就交給命運之輪吧！</p>
+
+        <div v-if="wheelCandidates.length < 2" class="py-8 text-xs font-black text-[#FF85A1]">
+          請先新增至少 2 間餐廳或調整篩選條件！
+        </div>
+
+        <div v-else class="relative mx-auto my-2 w-[240px] h-[240px]">
+          <!-- Pointer -->
+          <div class="absolute -top-3 left-1/2 -translate-x-1/2 z-10 text-2xl drop-shadow-md">👇</div>
+          <!-- Wheel Canvas -->
+          <canvas ref="wheelCanvas" width="240" height="240" class="rounded-full border-4 border-[#FFB6C1] shadow-md wheel-canvas" :style="{ transform: `rotate(${wheelRotation}deg)` }"></canvas>
+        </div>
+
+        <!-- Result Display -->
+        <div v-if="selectedWinner" class="mt-4 p-3 bg-[#FFF0F3] dark:bg-[#342845] rounded-2xl border-2 border-[#FFB6C1]">
+          <span class="text-xs font-black text-[#FF6B8B] block">恭喜抽中 🎉</span>
+          <span class="text-base font-black text-[#5A493A] dark:text-[#E2D9F3]">{{ selectedWinner.name }}</span>
+        </div>
+
+        <div class="mt-4 flex gap-2">
+          <button @click="spinWheel" :disabled="isSpinning || wheelCandidates.length < 2" class="flex-1 bg-[#FF6B8B] text-white py-3 rounded-2xl font-black text-xs doodle-button disabled:opacity-50">
+            {{ isSpinning ? '旋轉中...' : '開始抽籤 🎲' }}
+          </button>
+          <button @click="showWheelModal = false" class="px-4 bg-gray-200 dark:bg-gray-700 font-black text-xs rounded-2xl doodle-button">
+            關閉
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
-    const { createApp, ref, computed, onMounted } = Vue;
+    const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
     createApp({
       setup() {
         const firebaseUrl = "https://your-foodie-app-default-rtdb.firebaseio.com/food_places.json";
@@ -278,6 +352,18 @@
         const isSyncing = ref(false);
         const isEditingMode = ref(false);
         const currentEditingId = ref(null);
+        const isDarkMode = ref(false);
+
+        // Bulk selection states
+        const isSelectMode = ref(false);
+        const selectedIds = ref([]);
+
+        // Wheel Modal states
+        const showWheelModal = ref(false);
+        const isSpinning = ref(false);
+        const wheelRotation = ref(0);
+        const selectedWinner = ref(null);
+        const wheelCanvas = ref(null);
 
         const form = ref({
           name: '',
@@ -290,33 +376,64 @@
           notes: ''
         });
 
+        // Toggle Dark Mode
+        const toggleDarkMode = () => {
+          isDarkMode.value = !isDarkMode.value;
+          localStorage.setItem('foodie_dark_mode', isDarkMode.value);
+        };
+
+        // Storage Operations (Firebase + Local Storage Fallback)
+        const loadLocalData = () => {
+          const local = localStorage.getItem('foodie_places');
+          if (local) {
+            try { places.value = JSON.parse(local); } catch (e) { places.value = []; }
+          }
+        };
+
+        const saveLocalData = () => {
+          localStorage.setItem('foodie_places', JSON.stringify(places.value));
+        };
+
+        const fetchPlaces = async () => {
+          try {
+            const res = await fetch(firebaseUrl);
+            if (!res.ok) throw new Error("Network error");
+            const data = await res.json();
+            if (data) {
+              places.value = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+              saveLocalData();
+            } else {
+              places.value = [];
+              saveLocalData();
+            }
+          } catch (e) {
+            console.warn("Using LocalStorage fallback due to sync failure:", e);
+            loadLocalData();
+          }
+        };
+
+        const silentFetch = async () => {
+          if (showModal.value || showWheelModal.value || isSpinning.value) return;
+          await fetchPlaces();
+        };
+
+        // Dynamic Filtering
         const areaList = computed(() => {
           const set = new Set();
-          places.value.forEach(p => { 
-            if (p.area && p.area.trim() !== '') set.add(p.area.trim()); 
-          });
+          places.value.forEach(p => { if (p.area && p.area.trim()) set.add(p.area.trim()); });
           return Array.from(set).sort();
         });
 
         const categoryList = computed(() => {
           const set = new Set();
-          places.value.forEach(p => { 
-            if (p.category && p.category.trim() !== '') set.add(p.category.trim()); 
-          });
+          places.value.forEach(p => { if (p.category && p.category.trim()) set.add(p.category.trim()); });
           return Array.from(set).sort();
         });
-
-        const resetFilters = () => {
-          selectedArea.value = '';
-          selectedCategory.value = '';
-          searchText.value = '';
-        };
 
         const filteredPlaces = computed(() => {
           return places.value.filter(p => {
             const matchesArea = !selectedArea.value || p.area === selectedArea.value;
             const matchesCategory = !selectedCategory.value || p.category === selectedCategory.value;
-
             const q = searchText.value.toLowerCase().trim();
             const matchesSearch = !q || 
               (p.name && p.name.toLowerCase().includes(q)) ||
@@ -328,6 +445,53 @@
           });
         });
 
+        const resetFilters = () => {
+          selectedArea.value = '';
+          selectedCategory.value = '';
+          searchText.value = '';
+        };
+
+        // Bulk Selection Logic
+        const toggleSelectMode = () => {
+          isSelectMode.value = !isSelectMode.value;
+          selectedIds.value = [];
+        };
+
+        const isAllSelected = computed(() => {
+          return filteredPlaces.value.length > 0 && selectedIds.value.length === filteredPlaces.value.length;
+        });
+
+        const toggleSelectAll = () => {
+          if (isAllSelected.value) {
+            selectedIds.value = [];
+          } else {
+            selectedIds.value = filteredPlaces.value.map(p => p.id);
+          }
+        };
+
+        const deleteSelectedPlaces = async () => {
+          if (!confirm(`確定要刪除選取的 ${selectedIds.value.length} 項美食嗎？`)) return;
+          isSyncing.value = true;
+
+          const remaining = places.value.filter(p => !selectedIds.value.includes(p.id));
+          places.value = remaining;
+          saveLocalData();
+
+          for (const id of selectedIds.value) {
+            try {
+              const singleUrl = firebaseUrl.replace(".json", `/${id}.json`);
+              await fetch(singleUrl, { method: "DELETE" });
+            } catch (e) {
+              console.error(`Failed to delete key ${id} from Firebase`, e);
+            }
+          }
+
+          selectedIds.value = [];
+          isSelectMode.value = false;
+          isSyncing.value = false;
+        };
+
+        // URL Helpers
         const getGoogleMapsUrl = (item) => {
           if (item.mapUrl && item.mapUrl.startsWith('http')) return item.mapUrl;
           const query = encodeURIComponent(`${item.area || ''} ${item.name}`);
@@ -340,23 +504,7 @@
           return `https://www.openrice.com/zh/hongkong/restaurants?where=${query}`;
         };
 
-        const fetchPlaces = async () => {
-          try {
-            const res = await fetch(firebaseUrl);
-            const data = await res.json();
-            if (data) {
-              places.value = Object.keys(data).map(key => ({ id: key, ...data[key] }));
-            } else {
-              places.value = [];
-            }
-          } catch (e) { console.error("同步失敗:", e); }
-        };
-
-        const silentFetch = async () => {
-          if (showModal.value) return;
-          await fetchPlaces();
-        };
-
+        // Add / Edit operations
         const openAddDialog = () => {
           isEditingMode.value = false;
           currentEditingId.value = null;
@@ -376,420 +524,142 @@
           isSyncing.value = true;
           showModal.value = false;
 
-          try {
-            const key = isEditingMode.value ? currentEditingId.value : ("place_" + Date.now());
-            const singleUrl = firebaseUrl.replace(".json", `/${key}.json`);
+          const key = isEditingMode.value ? currentEditingId.value : ("place_" + Date.now());
+          const placeObj = { id: key, ...form.value };
 
+          // Update state & LocalStorage immediately
+          const index = places.value.findIndex(p => p.id === key);
+          if (index > -1) {
+            places.value[index] = placeObj;
+          } else {
+            places.value.unshift(placeObj);
+          }
+          saveLocalData();
+
+          try {
+            const singleUrl = firebaseUrl.replace(".json", `/${key}.json`);
             await fetch(singleUrl, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(form.value)
             });
-
-            await fetchPlaces();
-          } catch (e) { alert("儲存失敗！"); }
+          } catch (e) {
+            console.warn("Failed to sync save with Firebase, stored locally.", e);
+          }
           isSyncing.value = false;
         };
 
         const deletePlace = async (item) => {
           if (!confirm(`確定要刪除「${item.name}」嗎？`)) return;
           isSyncing.value = true;
+
+          places.value = places.value.filter(p => p.id !== item.id);
+          saveLocalData();
+
           try {
             const singleUrl = firebaseUrl.replace(".json", `/${item.id}.json`);
             await fetch(singleUrl, { method: "DELETE" });
-            await fetchPlaces();
-          } catch (e) { console.error(e); }
+          } catch (e) {
+            console.warn("Failed to sync delete with Firebase, updated locally.", e);
+          }
           isSyncing.value = false;
         };
 
-        onMounted(() => {
-          fetchPlaces();
-          setInterval(silentFetch, 5000);
-        });
+        // Wheel Logic
+        const wheelCandidates = computed(() => filteredPlaces.value);
 
-        return { places, searchText, selectedArea, selectedCategory, areaList, categoryList, filteredPlaces, resetFilters, showModal, isSyncing, isEditingMode, form, getGoogleMapsUrl, getOpenRiceUrl, openAddDialog, openEditDialog, savePlace, deletePlace };
-      }
-    }).mount('#app');
-  </script>
-</body>
-</html>is.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
-  
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+        const drawWheel = () => {
+          const canvas = wheelCanvas.value;
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
+          const numSlices = wheelCandidates.value.length;
+          if (numSlices === 0) return;
 
-  <style>
-    body { 
-      font-family: 'Zen Maru Gothic', 'Noto Sans TC', sans-serif; 
-      background-color: #FFFDF0;
-      color: #5A493A;
-      -webkit-tap-highlight-color: transparent;
-    }
+          const width = canvas.width;
+          const center = width / 2;
+          const radius = center - 5;
+          const sliceAngle = (2 * Math.PI) / numSlices;
+          const colors = ['#FFD1DC', '#FFB6C1', '#FFE082', '#C8E6C9', '#E3F2FD', '#E1BEE7'];
 
-    .doodle-card { 
-      background-color: #FFFFFF;
-      border: 2.5px solid #FFD1DC;
-      border-radius: 20px;
-      box-shadow: 3px 4px 0px #FFB6C1;
-    }
+          ctx.clearRect(0, 0, width, width);
 
-    .doodle-button {
-      border: 2px solid #5A493A;
-      box-shadow: 2px 3px 0px #5A493A;
-    }
-    
-    .doodle-button:active {
-      transform: translate(2px, 2px);
-      box-shadow: 0px 0px 0px #5A493A;
-    }
+          wheelCandidates.value.forEach((item, index) => {
+            const startAngle = index * sliceAngle;
+            const endAngle = startAngle + sliceAngle;
 
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    
-    .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
-    .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-  </style>
-</head>
-<body class="p-4 md:p-8 select-none">
+            ctx.beginPath();
+            ctx.moveTo(center, center);
+            ctx.arc(center, center, radius, startAngle, endAngle);
+            ctx.closePath();
+            ctx.fillStyle = colors[index % colors.length];
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.stroke();
 
-  <div id="app" class="max-w-md mx-auto pb-28">
-    
-    <!-- 頂部標題與狀態 -->
-    <div class="flex justify-between items-center mb-4 px-1 pt-2">
-      <div class="flex items-center gap-2">
-        <span class="text-3xl animate-bounce">🥐</span>
-        <div>
-          <h1 class="text-2xl font-black text-[#FF6B8B] tracking-wider">美食大冒險！</h1>
-          <p class="text-xs text-[#FFA0B4] font-bold">共有 {{ places.length }} 間口袋名單 ✨</p>
-        </div>
-      </div>
-      <div v-if="isSyncing" class="text-xs font-black text-[#FF6B8B] bg-[#FFF0F3] px-3 py-1 rounded-full flex items-center gap-1 border-2 border-[#FFB6C1]">
-        <span class="animate-spin inline-block">🍳</span> 煮飯中
-      </div>
-    </div>
-
-    <!-- 搜尋框 -->
-    <div class="mb-3">
-      <div class="relative">
-        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-[#FF85A1]">🔍</span>
-        <input v-model="searchText" type="text" placeholder="搜尋關鍵字..." 
-               class="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border-2 border-[#FFD1DC] focus:outline-none focus:border-[#FF6B8B] text-[#5A493A] font-bold shadow-xs transition-all placeholder-[#FFB6C1] text-xs">
-      </div>
-    </div>
-
-    <!-- 優化後的二級下拉選單篩選區 -->
-    <div class="grid grid-cols-2 gap-2 mb-4">
-      <!-- 地點選擇器 -->
-      <div>
-        <select v-model="selectedArea" 
-                class="w-full p-2.5 bg-white border-2 border-[#C8E6C9] rounded-2xl text-xs font-black text-[#2E7D32] focus:outline-none focus:border-[#4CAF50] transition-all">
-          <option value="">📍 所有地點 ({{ areaList.length }})</option>
-          <option v-for="area in areaList" :key="area" :value="area">
-            📍 {{ area }}
-          </option>
-        </select>
-      </div>
-
-      <!-- 美食類型選擇器 -->
-      <div>
-        <select v-model="selectedCategory" 
-                class="w-full p-2.5 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-black text-[#FF6B8B] focus:outline-none focus:border-[#FF5277] transition-all">
-          <option value="">🏷️ 所有美食 ({{ categoryList.length }})</option>
-          <option v-for="cat in categoryList" :key="cat" :value="cat">
-            🏷️ {{ cat }}
-          </option>
-        </select>
-      </div>
-    </div>
-
-    <!-- 已選條件重設條 (當有選擇時才顯示) -->
-    <div v-if="selectedArea || selectedCategory || searchText" class="flex justify-between items-center bg-[#FFF0F3] px-3 py-1.5 rounded-xl mb-4 text-xs border border-[#FFD1DC]">
-      <span class="font-bold text-[#FF6B8B]">
-        顯示 {{ filteredPlaces.length }} 筆篩選結果
-      </span>
-      <button @click="resetFilters" class="font-black text-[#E53935] hover:underline">
-        ✕ 清除篩選
-      </button>
-    </div>
-
-    <!-- 餐廳清單列表 -->
-    <div class="space-y-3">
-      <div v-if="filteredPlaces.length === 0" class="text-center py-16 text-[#FFB6C1] font-black text-sm leading-relaxed bg-white rounded-3xl border-2 border-dashed border-[#FFD1DC]">
-        🍩 找不到相關的美食<br>快點下方按鈕新增一間吧！
-      </div>
-
-      <div v-for="item in filteredPlaces" :key="item.id" 
-           class="doodle-card p-4 relative transition-all">
-        
-        <!-- 主要資料行 -->
-        <div class="flex justify-between items-start gap-2">
-          <div class="flex-1 min-w-0">
-            <!-- 地點與種類標籤 -->
-            <div class="flex flex-wrap gap-1 mb-1">
-              <span v-if="item.area" class="text-[10px] font-black bg-[#E8F5E9] text-[#2E7D32] px-2 py-0.5 rounded-md border border-[#C8E6C9]">
-                📍 {{ item.area }}
-              </span>
-              <span v-if="item.category" class="text-[10px] font-black bg-[#FFF0F3] text-[#FF6B8B] px-2 py-0.5 rounded-md border border-[#FFD1DC]">
-                🏷️ {{ item.category }}
-              </span>
-              <span v-if="item.visited" class="text-[10px] font-black bg-[#FFF8E1] text-[#FF8F00] px-2 py-0.5 rounded-md border border-[#FFE082]">
-                🍱 已打卡
-              </span>
-            </div>
-
-            <!-- 餐廳名稱 -->
-            <h3 class="text-base font-black text-[#5A493A] truncate">{{ item.name }}</h3>
-          </div>
-
-          <!-- 右側操作按鈕 -->
-          <div class="flex items-center gap-1.5 shrink-0">
-            <a :href="getGoogleMapsUrl(item)" target="_blank" 
-               class="bg-[#E3F2FD] text-[#1565C0] px-2.5 py-1 rounded-xl text-xs font-black doodle-button transition-transform flex items-center gap-0.5">
-              🗺️ <span class="hidden sm:inline">地圖</span>
-            </a>
-            <button @click="openEditDialog(item)" class="text-xs font-black text-[#FF8F00] bg-[#FFF8E1] p-1.5 rounded-xl border border-[#FFE082]">
-              ✏️
-            </button>
-            <button @click="deletePlace(item)" class="text-xs font-black text-[#E53935] bg-[#FFEBEE] p-1.5 rounded-xl border border-[#FFCDD2]">
-              🗑️
-            </button>
-          </div>
-        </div>
-
-        <!-- 評分 -->
-        <div v-if="item.visited && item.rating" class="flex items-center gap-1 text-amber-400 mt-1 text-xs">
-          <span>{{ '⭐'.repeat(item.rating) }}</span>
-        </div>
-
-        <!-- 筆記 -->
-        <p v-if="item.notes" class="text-xs font-bold text-[#7A6858] leading-relaxed mt-2 bg-[#FFFDF5] p-2.5 rounded-xl border border-dashed border-[#FFE082] whitespace-pre-wrap">
-          <span class="text-[#FF8F00]">💬 筆記：</span>{{ item.notes }}
-        </p>
-
-      </div>
-    </div>
-
-    <!-- 底部新增按鈕 -->
-    <div class="fixed bottom-6 left-0 right-0 px-4 max-w-md mx-auto z-40">
-      <button @click="openAddDialog" class="w-full bg-[#FF6B8B] hover:bg-[#FF5277] text-white py-4 rounded-3xl text-center font-black text-base doodle-button transition-transform">
-        ➕ 收藏新餐廳 / 美食 🍭
-      </button>
-    </div>
-
-    <!-- 彈出對話盒 -->
-    <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-end justify-center z-50 animate-fade-in" @click.self="showModal = false">
-      <div class="bg-[#FFFDF0] w-full max-w-md rounded-t-[36px] p-6 pb-8 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar border-t-4 border-[#FFB6C1]">
-        <div class="w-12 h-2 bg-[#FFD1DC] rounded-full mx-auto mb-4"></div>
-        
-        <h3 class="text-xl font-black text-[#FF6B8B] text-center mb-4">
-          {{ isEditingMode ? '修改美食資料 ✏️' : '藏入美食寶箱 🎁' }}
-        </h3>
-
-        <div class="space-y-3">
-          <div>
-            <label class="text-xs font-black text-[#FF85A1] mb-1 block">餐廳名稱 *</label>
-            <input type="text" v-model="form.name" placeholder="例如：貓咪草莓舒芙蕾 🥞" 
-                   class="w-full p-3 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] text-[#5A493A]">
-          </div>
-
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="text-xs font-black text-[#FF85A1] mb-1 block">在哪裡？(地點)</label>
-              <input type="text" v-model="form.area" placeholder="例如：中環 / 澀谷" 
-                     class="w-full p-3 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] text-[#5A493A]">
-            </div>
-            <div>
-              <label class="text-xs font-black text-[#FF85A1] mb-1 block">什麼種類？(美食)</label>
-              <input type="text" v-model="form.category" placeholder="例如：甜點 / 鬆餅" 
-                     class="w-full p-3 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] text-[#5A493A]">
-            </div>
-          </div>
-
-          <div>
-            <label class="text-xs font-black text-[#FF85A1] mb-1 block">Google 地圖連結 (留空會自動搜尋)</label>
-            <input type="text" v-model="form.mapUrl" placeholder="貼上 Google Maps 網址..." 
-                   class="w-full p-3 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] text-[#5A493A]">
-          </div>
-
-          <div class="bg-white p-3.5 rounded-2xl border-2 border-[#FFD1DC] space-y-2">
-            <div class="flex justify-between items-center">
-              <span class="text-xs font-black text-[#5A493A]">已經吃過了嗎？</span>
-              <button @click="form.visited = !form.visited" 
-                      :class="form.visited ? 'bg-[#FF6B8B] text-white' : 'bg-[#FFE8ED] text-[#FF85A1]'" 
-                      class="px-3 py-1.5 rounded-xl text-xs font-black transition-all">
-                {{ form.visited ? '吃過了 🍱' : '還沒吃 ✨' }}
-              </button>
-            </div>
-
-            <div v-if="form.visited" class="flex items-center justify-between pt-2 border-t border-[#FFE8ED]">
-              <span class="text-xs font-black text-[#FF85A1]">好吃的程度：</span>
-              <div class="flex gap-1 text-xl">
-                <span v-for="star in 5" :key="star" @click="form.rating = star" class="cursor-pointer transition-transform active:scale-125">
-                  {{ star <= form.rating ? '⭐' : '☆' }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label class="text-xs font-black text-[#FF85A1] mb-1 block">筆記 / 心得</label>
-            <textarea v-model="form.notes" rows="3" placeholder="例如：一定要點限量的抹茶千層蛋糕！" 
-                      class="w-full p-3 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-bold focus:outline-none focus:border-[#FF6B8B] text-[#5A493A] resize-none"></textarea>
-          </div>
-        </div>
-
-        <button @click="savePlace" class="w-full bg-[#FF6B8B] text-white py-3.5 rounded-2xl font-black text-sm mt-4 doodle-button">
-          {{ isEditingMode ? '儲存變更 ✏️' : '蓋章存檔 💮' }}
-        </button>
-      </div>
-    </div>
-
-  </div>
-
-  <script>
-    const { createApp, ref, computed, onMounted } = Vue;
-    createApp({
-      setup() {
-        const firebaseUrl = "https://your-foodie-app-default-rtdb.firebaseio.com/food_places.json";
-
-        const places = ref([]);
-        const searchText = ref('');
-        const selectedArea = ref('');
-        const selectedCategory = ref('');
-        const showModal = ref(false);
-        const isSyncing = ref(false);
-        const isEditingMode = ref(false);
-        const currentEditingId = ref(null);
-
-        const form = ref({
-          name: '',
-          area: '',
-          category: '',
-          mapUrl: '',
-          visited: false,
-          rating: 5,
-          notes: ''
-        });
-
-        // 自動收集並排序所有地點
-        const areaList = computed(() => {
-          const set = new Set();
-          places.value.forEach(p => { 
-            if (p.area && p.area.trim() !== '') set.add(p.area.trim()); 
+            // Render Labels
+            ctx.save();
+            ctx.translate(center, center);
+            ctx.rotate(startAngle + sliceAngle / 2);
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#5A493A';
+            ctx.font = 'bold 11px sans-serif';
+            const label = item.name.length > 7 ? item.name.substring(0, 6) + '..' : item.name;
+            ctx.fillText(label, radius - 15, 4);
+            ctx.restore();
           });
-          return Array.from(set).sort();
-        });
-
-        // 自動收集並排序所有美食種類
-        const categoryList = computed(() => {
-          const set = new Set();
-          places.value.forEach(p => { 
-            if (p.category && p.category.trim() !== '') set.add(p.category.trim()); 
-          });
-          return Array.from(set).sort();
-        });
-
-        // 重設所有篩選條件
-        const resetFilters = () => {
-          selectedArea.value = '';
-          selectedCategory.value = '';
-          searchText.value = '';
         };
 
-        // 交叉交叉過濾 (地點 + 美食種類 + 搜尋關鍵字)
-        const filteredPlaces = computed(() => {
-          return places.value.filter(p => {
-            const matchesArea = !selectedArea.value || p.area === selectedArea.value;
-            const matchesCategory = !selectedCategory.value || p.category === selectedCategory.value;
-
-            const q = searchText.value.toLowerCase().trim();
-            const matchesSearch = !q || 
-              (p.name && p.name.toLowerCase().includes(q)) ||
-              (p.area && p.area.toLowerCase().includes(q)) ||
-              (p.category && p.category.toLowerCase().includes(q)) ||
-              (p.notes && p.notes.toLowerCase().includes(q));
-
-            return matchesArea && matchesCategory && matchesSearch;
-          });
-        });
-
-        const getGoogleMapsUrl = (item) => {
-          if (item.mapUrl && item.mapUrl.startsWith('http')) return item.mapUrl;
-          const query = encodeURIComponent(`${item.area || ''} ${item.name}`);
-          return `https://www.google.com/maps/search/?api=1&query=${query}`;
+        const openWheelModal = () => {
+          selectedWinner.value = null;
+          wheelRotation.value = 0;
+          showWheelModal.value = true;
+          nextTick(() => { drawWheel(); });
         };
 
-        const fetchPlaces = async () => {
-          try {
-            const res = await fetch(firebaseUrl);
-            const data = await res.json();
-            if (data) {
-              places.value = Object.keys(data).map(key => ({ id: key, ...data[key] }));
-            } else {
-              places.value = [];
+        const spinWheel = () => {
+          if (isSpinning.value || wheelCandidates.value.length < 2) return;
+          isSpinning.value = true;
+          selectedWinner.value = null;
+
+          const candidateCount = wheelCandidates.value.length;
+          const selectedIndex = Math.floor(Math.random() * candidateCount);
+          const sliceAngle = 360 / candidateCount;
+          
+          // Calculate target rotation to land slice on top pointer (-90 deg offset)
+          const targetSliceAngle = (360 - (selectedIndex * sliceAngle) - (sliceAngle / 2) - 90) % 360;
+          const extraRotations = 5 * 360; // 5 full spins
+          const finalRotation = wheelRotation.value + extraRotations + (targetSliceAngle - (wheelRotation.value % 360));
+
+          wheelRotation.value = finalRotation;
+
+          setTimeout(() => {
+            isSpinning.value = false;
+            selectedWinner.value = wheelCandidates.value[selectedIndex];
+            if (window.confetti) {
+              confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
             }
-          } catch (e) { console.error("同步失敗:", e); }
-        };
-
-        const silentFetch = async () => {
-          if (showModal.value) return;
-          await fetchPlaces();
-        };
-
-        const openAddDialog = () => {
-          isEditingMode.value = false;
-          currentEditingId.value = null;
-          form.value = { name: '', area: '', category: '', mapUrl: '', visited: false, rating: 5, notes: '' };
-          showModal.value = true;
-        };
-
-        const openEditDialog = (item) => {
-          isEditingMode.value = true;
-          currentEditingId.value = item.id;
-          form.value = { ...item };
-          showModal.value = true;
-        };
-
-        const savePlace = async () => {
-          if (!form.value.name.trim()) return alert("請寫下餐廳名稱唷！");
-          isSyncing.value = true;
-          showModal.value = false;
-
-          try {
-            const key = isEditingMode.value ? currentEditingId.value : ("place_" + Date.now());
-            const singleUrl = firebaseUrl.replace(".json", `/${key}.json`);
-
-            await fetch(singleUrl, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(form.value)
-            });
-
-            await fetchPlaces();
-          } catch (e) { alert("儲存失敗！"); }
-          isSyncing.value = false;
-        };
-
-        const deletePlace = async (item) => {
-          if (!confirm(`確定要刪除「${item.name}」嗎？`)) return;
-          isSyncing.value = true;
-          try {
-            const singleUrl = firebaseUrl.replace(".json", `/${item.id}.json`);
-            await fetch(singleUrl, { method: "DELETE" });
-            await fetchPlaces();
-          } catch (e) { console.error(e); }
-          isSyncing.value = false;
+          }, 4000);
         };
 
         onMounted(() => {
+          const savedDark = localStorage.getItem('foodie_dark_mode');
+          if (savedDark !== null) {
+            isDarkMode.value = savedDark === 'true';
+          }
           fetchPlaces();
           setInterval(silentFetch, 5000);
         });
 
-        return { places, searchText, selectedArea, selectedCategory, areaList, categoryList, filteredPlaces, resetFilters, showModal, isSyncing, isEditingMode, form, getGoogleMapsUrl, openAddDialog, openEditDialog, savePlace, deletePlace };
+        return {
+          places, searchText, selectedArea, selectedCategory, areaList, categoryList, 
+          filteredPlaces, resetFilters, showModal, isSyncing, isEditingMode, form, 
+          getGoogleMapsUrl, getOpenRiceUrl, openAddDialog, openEditDialog, savePlace, 
+          deletePlace, isDarkMode, toggleDarkMode, isSelectMode, selectedIds, 
+          toggleSelectMode, isAllSelected, toggleSelectAll, deleteSelectedPlaces,
+          showWheelModal, wheelCandidates, wheelCanvas, wheelRotation, isSpinning, 
+          selectedWinner, openWheelModal, spinWheel
+        };
       }
     }).mount('#app');
   </script>
