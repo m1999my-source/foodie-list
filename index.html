@@ -68,34 +68,44 @@
     <div class="mb-3">
       <div class="relative">
         <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-[#FF85A1]">🔍</span>
-        <input v-model="searchText" type="text" placeholder="尋找餐廳、地點或美食分類..." 
+        <input v-model="searchText" type="text" placeholder="搜尋關鍵字..." 
                class="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border-2 border-[#FFD1DC] focus:outline-none focus:border-[#FF6B8B] text-[#5A493A] font-bold shadow-xs transition-all placeholder-[#FFB6C1] text-xs">
       </div>
     </div>
 
-    <!-- 地點與美食分類快速篩選（合併清單） -->
-    <div class="mb-4">
-      <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2 px-1">
-        <button @click="selectedFilter = 'all'" 
-                :class="selectedFilter === 'all' ? 'bg-[#FF6B8B] text-white border-2 border-[#5A493A]' : 'bg-white text-[#FF85A1] border-2 border-[#FFE8ED]'"
-                class="px-3.5 py-1.5 rounded-full text-xs font-black transition-all whitespace-nowrap">
-          ✨ 全部 ({{ places.length }})
-        </button>
-
-        <!-- 地點標籤 -->
-        <button v-for="area in areaList" :key="'area-'+area" @click="selectedFilter = 'area:' + area"
-                :class="selectedFilter === 'area:' + area ? 'bg-[#FFB6C1] text-[#5A493A] border-2 border-[#5A493A]' : 'bg-white text-[#4CAF50] border-2 border-[#E8F5E9]'"
-                class="px-3 py-1.5 rounded-full text-xs font-black transition-all whitespace-nowrap">
-          📍 {{ area }}
-        </button>
-
-        <!-- 美食種類標籤 -->
-        <button v-for="cat in categoryList" :key="'cat-'+cat" @click="selectedFilter = 'cat:' + cat"
-                :class="selectedFilter === 'cat:' + cat ? 'bg-[#FFB6C1] text-[#5A493A] border-2 border-[#5A493A]' : 'bg-white text-[#FF6B8B] border-2 border-[#FFF0F3]'"
-                class="px-3 py-1.5 rounded-full text-xs font-black transition-all whitespace-nowrap">
-          🏷️ {{ cat }}
-        </button>
+    <!-- 優化後的二級下拉選單篩選區 -->
+    <div class="grid grid-cols-2 gap-2 mb-4">
+      <!-- 地點選擇器 -->
+      <div>
+        <select v-model="selectedArea" 
+                class="w-full p-2.5 bg-white border-2 border-[#C8E6C9] rounded-2xl text-xs font-black text-[#2E7D32] focus:outline-none focus:border-[#4CAF50] transition-all">
+          <option value="">📍 所有地點 ({{ areaList.length }})</option>
+          <option v-for="area in areaList" :key="area" :value="area">
+            📍 {{ area }}
+          </option>
+        </select>
       </div>
+
+      <!-- 美食類型選擇器 -->
+      <div>
+        <select v-model="selectedCategory" 
+                class="w-full p-2.5 bg-white border-2 border-[#FFD1DC] rounded-2xl text-xs font-black text-[#FF6B8B] focus:outline-none focus:border-[#FF5277] transition-all">
+          <option value="">🏷️ 所有美食 ({{ categoryList.length }})</option>
+          <option v-for="cat in categoryList" :key="cat" :value="cat">
+            🏷️ {{ cat }}
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 已選條件重設條 (當有選擇時才顯示) -->
+    <div v-if="selectedArea || selectedCategory || searchText" class="flex justify-between items-center bg-[#FFF0F3] px-3 py-1.5 rounded-xl mb-4 text-xs border border-[#FFD1DC]">
+      <span class="font-bold text-[#FF6B8B]">
+        顯示 {{ filteredPlaces.length }} 筆篩選結果
+      </span>
+      <button @click="resetFilters" class="font-black text-[#E53935] hover:underline">
+        ✕ 清除篩選
+      </button>
     </div>
 
     <!-- 餐廳清單列表 -->
@@ -107,7 +117,7 @@
       <div v-for="item in filteredPlaces" :key="item.id" 
            class="doodle-card p-4 relative transition-all">
         
-        <!-- 主要資料行 (清單風格) -->
+        <!-- 主要資料行 -->
         <div class="flex justify-between items-start gap-2">
           <div class="flex-1 min-w-0">
             <!-- 地點與種類標籤 -->
@@ -127,7 +137,7 @@
             <h3 class="text-base font-black text-[#5A493A] truncate">{{ item.name }}</h3>
           </div>
 
-          <!-- 右側操作按鈕 (地圖 + 編輯/刪除) -->
+          <!-- 右側操作按鈕 -->
           <div class="flex items-center gap-1.5 shrink-0">
             <a :href="getGoogleMapsUrl(item)" target="_blank" 
                class="bg-[#E3F2FD] text-[#1565C0] px-2.5 py-1 rounded-xl text-xs font-black doodle-button transition-transform flex items-center gap-0.5">
@@ -240,7 +250,8 @@
 
         const places = ref([]);
         const searchText = ref('');
-        const selectedFilter = ref('all');
+        const selectedArea = ref('');
+        const selectedCategory = ref('');
         const showModal = ref(false);
         const isSyncing = ref(false);
         const isEditingMode = ref(false);
@@ -256,35 +267,36 @@
           notes: ''
         });
 
-        // 收集所有「地點 (area)」
+        // 自動收集並排序所有地點
         const areaList = computed(() => {
           const set = new Set();
           places.value.forEach(p => { 
             if (p.area && p.area.trim() !== '') set.add(p.area.trim()); 
           });
-          return Array.from(set);
+          return Array.from(set).sort();
         });
 
-        // 收集所有「美食種類 (category)」
+        // 自動收集並排序所有美食種類
         const categoryList = computed(() => {
           const set = new Set();
           places.value.forEach(p => { 
             if (p.category && p.category.trim() !== '') set.add(p.category.trim()); 
           });
-          return Array.from(set);
+          return Array.from(set).sort();
         });
 
-        // 根據選擇的篩選過濾清單
+        // 重設所有篩選條件
+        const resetFilters = () => {
+          selectedArea.value = '';
+          selectedCategory.value = '';
+          searchText.value = '';
+        };
+
+        // 交叉交叉過濾 (地點 + 美食種類 + 搜尋關鍵字)
         const filteredPlaces = computed(() => {
           return places.value.filter(p => {
-            let matchesFilter = true;
-            if (selectedFilter.value.startsWith('area:')) {
-              const targetArea = selectedFilter.value.replace('area:', '');
-              matchesFilter = p.area === targetArea;
-            } else if (selectedFilter.value.startsWith('cat:')) {
-              const targetCat = selectedFilter.value.replace('cat:', '');
-              matchesFilter = p.category === targetCat;
-            }
+            const matchesArea = !selectedArea.value || p.area === selectedArea.value;
+            const matchesCategory = !selectedCategory.value || p.category === selectedCategory.value;
 
             const q = searchText.value.toLowerCase().trim();
             const matchesSearch = !q || 
@@ -293,7 +305,7 @@
               (p.category && p.category.toLowerCase().includes(q)) ||
               (p.notes && p.notes.toLowerCase().includes(q));
 
-            return matchesFilter && matchesSearch;
+            return matchesArea && matchesCategory && matchesSearch;
           });
         });
 
@@ -370,7 +382,7 @@
           setInterval(silentFetch, 5000);
         });
 
-        return { places, searchText, selectedFilter, areaList, categoryList, filteredPlaces, showModal, isSyncing, isEditingMode, form, getGoogleMapsUrl, openAddDialog, openEditDialog, savePlace, deletePlace };
+        return { places, searchText, selectedArea, selectedCategory, areaList, categoryList, filteredPlaces, resetFilters, showModal, isSyncing, isEditingMode, form, getGoogleMapsUrl, openAddDialog, openEditDialog, savePlace, deletePlace };
       }
     }).mount('#app');
   </script>
